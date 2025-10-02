@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>AgroBar — Soma de Consumo</title>
+  <style>
+    :root{
+      --bg:#0b0b0b;
+      --card:#141414;
+      --muted:#bdbdbd;
+      --accent:#ffd166;
+      --glass: rgba(255,255,255,0.03);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{
+      font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+      background:linear-gradient(180deg,var(--bg),#080808);
+      color:#fff;
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      padding:12px;
+    }
+
+    header{display:flex;flex-direction:column;gap:8px;margin-bottom:14px;}
+    .brand{display:flex;gap:10px;align-items:center}
+    .logo{width:46px;height:46px;border-radius:10px;background:linear-gradient(135deg,#222,#111);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--accent);font-size:16px}
+    h1{font-size:18px;line-height:1.2}
+    p.lead{color:var(--muted);font-size:12px}
+
+    main{display:flex;flex-direction:column;gap:14px}
+
+    .search-box{margin:8px 0;}
+    .search-box input{width:100%;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:#111;color:#fff;font-size:14px;}
+
+    .controls{display:flex;gap:6px;flex-wrap:wrap;overflow-x:auto;padding-bottom:6px}
+    .tab{background:var(--glass);padding:6px 10px;border-radius:999px;cursor:pointer;color:var(--muted);font-size:13px;flex-shrink:0;white-space:nowrap}
+    .tab.active{background:linear-gradient(90deg,#222,#1a1a1a);color:#fff;box-shadow:0 3px 10px rgba(0,0,0,0.5)}
+
+    .products{display:grid;grid-template-columns:1fr;gap:10px}
+    .product{background:var(--card);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:6px}
+    .top{display:flex;gap:10px;align-items:center}
+    .thumb{width:52px;height:52px;border-radius:8px;background:#111;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px}
+    .meta{flex:1}
+    .meta h3{font-size:14px;margin:0}
+    .meta p{margin:0;color:var(--muted);font-size:12px}
+    .price{font-weight:700}
+
+    .actions{display:flex;align-items:center;gap:6px}
+    .qty-btn{width:30px;height:30px;border-radius:6px;border:1px solid rgba(255,255,255,0.05);background:transparent;color:#fff;cursor:pointer;font-size:16px}
+    .qty{min-width:28px;text-align:center;font-size:14px}
+
+    .cart{background:#101010;padding:12px;border-radius:12px}
+    .cart h2{font-size:16px;margin-bottom:6px}
+    .cart-list{max-height:220px;overflow:auto;margin-bottom:8px}
+    .cart-item{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed rgba(255,255,255,0.05);font-size:13px}
+    .cart-item small{color:var(--muted)}
+    .totals{display:flex;justify-content:space-between;font-weight:700;margin-bottom:8px;font-size:15px}
+    .cart-actions{display:flex;gap:6px}
+    button.btn{flex:1;padding:8px;border-radius:8px;border:0;cursor:pointer;font-weight:700;font-size:14px}
+    .btn.clear{background:transparent;border:1px solid rgba(255,255,255,0.08);color:var(--muted)}
+    .btn.checkout{background:var(--accent);color:#000}
+
+    .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);z-index:40;padding:12px}
+    .modal.show{display:flex}
+    .modal-card{background:#0e0e0e;padding:16px;border-radius:10px;max-width:320px;width:100%;text-align:center}
+    .modal-card img{max-width:200px;width:100%;display:block;margin:10px auto}
+    .modal-card .close{margin-top:10px;padding:8px 10px;border-radius:6px;border:0;background:#222;color:#fff;font-size:14px}
+
+    footer{margin-top:14px;color:var(--muted);font-size:12px;text-align:center}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="logo">BAR</div>
+      <div>
+        <h1>AgroBar</h1>
+        <p class="lead">Adicione itens, salve e finalize via PIX</p>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <div class="search-box">
+        <input type="text" id="searchInput" placeholder="🔍 Buscar produto...">
+      </div>
+      <div class="controls" id="categoryTabs"></div>
+      <div class="products" id="productsGrid"></div>
+    </section>
+
+    <aside>
+      <div class="cart">
+        <h2>Resumo</h2>
+        <div class="cart-list" id="cartList"></div>
+        <div class="totals">
+          <div>Total</div>
+          <div id="totalAmount">R$ 0,00</div>
+        </div>
+        <div class="cart-actions">
+          <button class="btn clear" id="clearBtn">Limpar</button>
+          <button class="btn checkout" id="checkoutBtn">Finalizar</button>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <footer>
+    <small>Coloque o arquivo <code>qrcode-pix.png</code> na mesma pasta para o QR aparecer.</small>
+  </footer>
+
+  <div class="modal" id="pixModal">
+    <div class="modal-card">
+      <h3>Escaneie para pagar (PIX)</h3>
+      <p id="pixValue" style="margin:0;color:var(--muted)"></p>
+      <img id="pixImg" src="qrcode-pix.png" alt="QR Code PIX" onerror="this.style.display='none'">
+      <p style="color:var(--muted);font-size:12px">Ou copie o valor manualmente.</p>
+      <button class="close" id="closeModalBtn">Fechar</button>
+    </div>
+  </div>
+
+  <script>
+    const PRODUCTS = [
+      {id:'s1', category:'Sinuca', name:'Ficha de Sinuca', price:2},
+      {id:'p1', category:'Petiscos', name:'Skiny Grande', price:3},
+      {id:'p2', category:'Petiscos', name:'Skiny de Pequeno', price:2.5},
+      {id:'p3', category:'Petiscos', name:'Esquine Explosal', price:2.5},
+      {id:'p4', category:'Petiscos', name:'Bacon Explosão', price:4},
+      {id:'p5', category:'Petiscos', name:'Petiscos Diversos', price:2},
+      {id:'b4', category:'Bebidas', name:'Coca-Cola 2L', price:12},
+      {id:'b5', category:'Bebidas', name:'Refrigerante Jaó 2L', price:8},
+      {id:'b6', category:'Bebidas', name:'Guaraná 1L', price:8},
+      {id:'b7', category:'Bebidas', name:'Coca-Cola Lata', price:5},
+      {id:'b8', category:'Bebidas', name:'Dose de Para Tudo', price:3},
+      {id:'b9', category:'Bebidas', name:'Energético Red Bull', price:10},
+      {id:'b10', category:'Bebidas', name:'Limoneto (1L/2L)', price:12},
+      {id:'b11', category:'Bebidas', name:'Água com Gás', price:3},
+      {id:'b12', category:'Bebidas', name:'Água sem Gás', price:2},
+      {id:'c1', category:'Cervejas', name:'Cerveja Long Neck Heineken', price:8},
+      {id:'c2', category:'Cervejas', name:'Cerveja Profissa (Antarctica/Brahma)', price:4.5},
+      {id:'c3', category:'Cervejas', name:'Cerveja Lata', price:5},
+      {id:'d1', category:'Doces', name:'chiclete', price:0.5},
+      {id:'d2', category:'Doces', name:'Pirulito', price:0.5},
+      {id:'d3', category:'Doces', name:'Picolé', price:1},
+    ];
+
+    const LS_KEY = 'loja_bar_cart_v1';
+    let cart = loadCart();
+    let currentCategory = 'Todos';
+    let searchQuery = '';
+
+    const productsGrid = document.getElementById('productsGrid');
+    const categoryTabs = document.getElementById('categoryTabs');
+    const cartList = document.getElementById('cartList');
+    const totalAmount = document.getElementById('totalAmount');
+    const clearBtn = document.getElementById('clearBtn');
+    const checkoutBtn = document.getElementById('checkoutBtn');
+    const pixModal = document.getElementById('pixModal');
+    const pixValue = document.getElementById('pixValue');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    const searchInput = document.getElementById('searchInput');
+
+    renderCategories();
+    renderProducts();
+    renderCart();
+
+    function saveCart(){ localStorage.setItem(LS_KEY, JSON.stringify(cart)); }
+    function loadCart(){ try{ return JSON.parse(localStorage.getItem(LS_KEY)) || {}; }catch(e){return {}} }
+
+    function renderCategories(){
+      const cats = ['Todos', ...Array.from(new Set(PRODUCTS.map(p=>p.category)))];
+      categoryTabs.innerHTML='';
+      cats.forEach(cat=>{
+        const btn = document.createElement('button');
+        btn.className = 'tab' + (cat===currentCategory ? ' active' : '');
+        btn.textContent = cat;
+        btn.onclick = ()=>{ currentCategory = cat; document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active')); btn.classList.add('active'); renderProducts(); };
+        categoryTabs.appendChild(btn);
+      });
+    }
+
+    function renderProducts(){
+      let filtered = currentCategory === 'Todos' ? PRODUCTS : PRODUCTS.filter(p=>p.category===currentCategory);
+      if(searchQuery.trim()!==''){
+        filtered = filtered.filter(p=>p.name.toLowerCase().includes(searchQuery.toLowerCase()));
+      }
+
+      productsGrid.innerHTML = '';
+      if(filtered.length===0){
+        productsGrid.innerHTML = '<p style="color:var(--muted)">Nenhum produto encontrado.</p>';
+        return;
+      }
+
+      filtered.forEach(p=>{
+        const el = document.createElement('div'); el.className='product';
+        el.innerHTML = `
+          <div class="top">
+            <div class="thumb">${p.name.split(' ').slice(0,2).map(w=>w[0]).join('')}</div>
+            <div class="meta">
+              <h3>${p.name}</h3>
+              <p class="price">${formatCurrency(p.price)}</p>
+              <small style="color:var(--muted)">${p.category}</small>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div class="actions">
+              <button class="qty-btn" data-action="decrease" data-id="${p.id}">−</button>
+              <div class="qty" id="qty-${p.id}">${cart[p.id]||0}</div>
+              <button class="qty-btn" data-action="increase" data-id="${p.id}">+</button>
+            </div>
+          </div>
+        `;
+        productsGrid.appendChild(el);
+      });
+
+      document.querySelectorAll('.qty-btn').forEach(b=>{
+        b.addEventListener('click', (e)=>{
+          const id = e.currentTarget.dataset.id;
+          const act = e.currentTarget.dataset.action;
+          changeQty(id, act==='increase'?1:-1);
+        });
+      });
+    }
+
+    function changeQty(id, delta){
+      const current = cart[id] || 0;
+      const next = Math.max(0, current + delta);
+      if(next === 0) delete cart[id]; else cart[id] = next;
+      const qtyEl = document.getElementById('qty-'+id);
+      if(qtyEl) qtyEl.textContent = cart[id]||0;
+      saveCart();
+      renderCart();
+    }
+
+    function renderCart(){
+      cartList.innerHTML = '';
+      const items = Object.keys(cart).map(id=>{
+        const prod = PRODUCTS.find(p=>p.id===id);
+        return {id, product:prod, qty:cart[id]};
+      }).filter(i=>i.product);
+
+      if(items.length===0){ cartList.innerHTML = '<p style="color:var(--muted)">Carrinho vazio</p>'; }
+      items.forEach(it=>{
+        const row = document.createElement('div'); row.className='cart-item';
+        const name = document.createElement('div'); name.innerHTML = `<div>${it.product.name}</div><small>${it.qty} x ${formatCurrency(it.product.price)}</small>`;
+        const right = document.createElement('div'); right.innerHTML = `<div>${formatCurrency(it.qty * it.product.price)}</div>`;
+        row.appendChild(name); row.appendChild(right);
+        cartList.appendChild(row);
+      });
+
+      const total = items.reduce((s,i)=>s+i.qty*i.product.price,0);
+      totalAmount.textContent = formatCurrency(total);
+    }
+
+    function formatCurrency(v){ return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v); }
+
+    clearBtn.addEventListener('click', ()=>{
+      if(confirm('Deseja limpar todo o carrinho?')){
+        cart = {}; saveCart(); renderProducts(); renderCart();
+      }
+    });
+
+    checkoutBtn.addEventListener('click', ()=>{
+      const total = Object.keys(cart).reduce((s,id)=>{
+        const p = PRODUCTS.find(x=>x.id===id); return s+(p?p.price*cart[id]:0);
+      },0);
+      if(total<=0){ alert('Seu carrinho está vazio.'); return; }
+      pixValue.textContent = formatCurrency(total);
+      pixModal.classList.add('show');
+    });
+
+    closeModalBtn.addEventListener('click', ()=>{ pixModal.classList.remove('show'); });
+    pixModal.addEventListener('click', (e)=>{ if(e.target===pixModal) pixModal.classList.remove('show'); });
+    document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') pixModal.classList.remove('show'); });
+
+    searchInput.addEventListener('input', (e)=>{
+      searchQuery = e.target.value;
+      renderProducts();
+    });
+  </script>
+</body>
+</html>
